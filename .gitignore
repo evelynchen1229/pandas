@@ -2,4 +2,4 @@ pandasfoundation
 *.md
 data/
 *.png
-.txt
+*.txt
