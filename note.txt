@@ -1,8 +1,0 @@
-FreecodeCamp - pandas foundation
-
-1. pandas is built based on numpy
-2. pd.Series - can change index from sequential number to meaningful  names (list like change to dictionary like data) - ordered sequence of list powered by numpy array and can have labels as index
-3. upper limit for slicing is included in pd.Series if slicing by lables (postion indexing would be like normal python slicing - upper limit not included)
-4.df.loc -- select row by index name; df.iloc -- select row by sequential order; df['']-- select column by column name
-5.df.loc/df.iloc can choose multiple dimensions - df.loc[row,column];np array axis - row: axis 1; column axis 0
-6.manuplication is immutable; mutable when you have "=" sign for modification
