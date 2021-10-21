@@ -2,17 +2,14 @@
     AND ARE CONSEQUENTLY PROCESSED IN PANDAS
 '''
 
-import cx_Oracle
 import pandas as pd
 import csv
 import datetime as dt
-import win32com.client
 from pandas import ExcelWriter
-import os
 
-## CREDIT DAT FROM LAW 
-dsn_tns_base = cx_Oracle.makedsn('PSDB3684.LEXIS-NEXIS.COM', '1521', service_name='GBIPRD1.ISPPROD.LEXISNEXIS.COM') 
-conn_base = cx_Oracle.connect(user='DATAANALYTICS', password='DatPwd123Z', dsn=dsn_tns_base) 
+## CREDIT DAT FROM LAW
+dsn_tns_base = cx_Oracle.makedsn('PSDB3684.LEXIS-NEXIS.COM', '1521', service_name='GBIPRD1.ISPPROD.LEXISNEXIS.COM')
+conn_base = cx_Oracle.connect(user='DATAANALYTICS', password='DatPwd123Z', dsn=dsn_tns_base)
 
 
 period = input('Enter current period (YYYYMM): ')
@@ -76,7 +73,7 @@ with sales_ops_product AS
   sum(PY_ON) Credit_PY_ON,
   sum(PY_PR) Credit_PY_PR,
   sum(CY_OA) Credit_PY_OA
-  from  
+  from
   (select credit.accnt_legcy_id,salesops_medcodeclass,fy,SUB_STAT,
   case when salesops_medcodeclass='ON' and fy='cy' then "Invoice Amount" end as CY_ON,
   case when salesops_medcodeclass='PR' and fy='cy' then "Invoice Amount" end as CY_PR,
@@ -88,13 +85,13 @@ with sales_ops_product AS
 from(
 SELECT
   INV.ROW_WID, acc.ACCNT_LEGCY_ID,prod.prod_cd,sop.salesops_medcodeclass,sub.SUB_STAT,
-  INV.INTEGRATION_ID AS "Invoice Line", INV.ORIG_INV_NUM AS "Original Invoice #", INV.DT_INV "Invoice Date", 
+  INV.INTEGRATION_ID AS "Invoice Line", INV.ORIG_INV_NUM AS "Original Invoice #", INV.DT_INV "Invoice Date",
   F.DOC_AMT AS "Invoice Amount", ORIG.INTEGRATION_ID AS "Original Invoice", ORIG.DT_INV AS "Original Invoice Date",
   case when INV.DT_INV between TO_DATE('{0}', 'YYYY-MM-DD') and (to_date ('{1}','YYYY-MM-DD')-1)-- Need to change this to whatever date we are going to use - likely first day of avatar year
   AND ORIG.DT_INV < TO_DATE('{0}', 'YYYY-MM-DD') then 'py'
   when  INV.DT_INV >= TO_DATE('{1}', 'YYYY-MM-DD') -- Need to change this to whatever date we are going to use - likely first day of avatar year
-  AND ORIG.DT_INV < TO_DATE('{1}', 'YYYY-MM-DD') 
-  then 'cy' 
+  AND ORIG.DT_INV < TO_DATE('{1}', 'YYYY-MM-DD')
+  then 'cy'
   end as fy
 FROM
   law.D_INVOICE_LN INV
@@ -115,7 +112,7 @@ WHERE
   --test
   AND INV.DT_INV >= TO_DATE('{0}', 'YYYY-MM-DD') -- Need to change this to whatever date we are going to use - likely first day of avatar year
   AND ORIG.DT_INV < TO_DATE('{0}', 'YYYY-MM-DD') -- Need to change this to whatever date we are going to use - likely first day of avatar year
-  
+
   AND F.DOC_AMT < 0 -- Only Credits
   --and ACC.accnt_legcy_id = 'AGBA5003'
   ORDER BY INV.DT_INV, INV.INTEGRATION_ID)credit
@@ -124,7 +121,7 @@ WHERE
 )
 select *
 from credit
-    
+
 """.format(py_yr_st,cy_yr_st)
 df_credit = pd.read_sql(query_credit, con=conn_base)
 output_credit =  os.getcwd()+'\\Raw Data\\Raw_credit.csv'

@@ -71,6 +71,8 @@ with sales_ops_product AS
 ),
  credit as (
  select accnt_legcy_id,
+  sum(CAE_sub) CAE_subs_value,
+  sum(active_sub) active_subs_value,
   sum(CY_ON) Credit_CY_ON,
   sum(CY_PR) Credit_CY_PR,
   sum(CY_OA) Credit_CY_OA,
@@ -78,16 +80,18 @@ with sales_ops_product AS
   sum(PY_PR) Credit_PY_PR,
   sum(CY_OA) Credit_PY_OA
   from
-  (select credit.accnt_legcy_id,salesops_medcodeclass,fy,
+  (select credit.accnt_legcy_id,salesops_medcodeclass,fy,SUB_STAT,
   case when salesops_medcodeclass='ON' and fy='cy' then "Invoice Amount" end as CY_ON,
   case when salesops_medcodeclass='PR' and fy='cy' then "Invoice Amount" end as CY_PR,
   case when salesops_medcodeclass='OA' and fy='cy' then "Invoice Amount" end as CY_OA,
   case when salesops_medcodeclass='ON' and fy='py' then "Invoice Amount" end as PY_ON,
   case when salesops_medcodeclass='PR' and fy='py' then "Invoice Amount" end as PY_PR,
-  case when salesops_medcodeclass='OA' and fy='py' then "Invoice Amount" end as PY_OA
+  case when salesops_medcodeclass='OA' and fy='py' then "Invoice Amount" end as PY_OA,
+  case when salesops_medcodeclass='ON' and SUB_STAT = 'Cancel At End' then "Invoice Amount" end as CAE_sub,
+  case when salesops_medcodeclass='ON' and SUB_STAT in ('Active','Cancel At End','Complete at End') then "Invoice Amount" end as active_sub
 from(
 SELECT
-  INV.ROW_WID, acc.ACCNT_LEGCY_ID,prod.prod_cd,sop.salesops_medcodeclass,
+  INV.ROW_WID, acc.ACCNT_LEGCY_ID,prod.prod_cd,sop.salesops_medcodeclass,sub.SUB_STAT,
   INV.INTEGRATION_ID AS "Invoice Line", INV.ORIG_INV_NUM AS "Original Invoice #", INV.DT_INV "Invoice Date",
   F.DOC_AMT AS "Invoice Amount", ORIG.INTEGRATION_ID AS "Original Invoice", ORIG.DT_INV AS "Original Invoice Date",
   case when INV.DT_INV between TO_DATE('{0}', 'YYYY-MM-DD') and (to_date ('{1}','YYYY-MM-DD')-1)-- Need to change this to whatever date we are going to use - likely first day of avatar year
@@ -103,6 +107,7 @@ FROM
   inner join law.d_fin_accnt_x acc on acc.row_wid = f.fa_wid
   inner join law.d_product prod on prod.row_wid = f.prod_wid
   inner join sales_ops_product sop ON sop.row_wid=prod.row_wid
+  left join law.D_SUBSCR_REV sub on sub.row_wid = f.subr_wid
 WHERE
   INV.DELETE_FLG = 'N' -- Invoice has not been deleted
   AND INV.DATASOURCE_NUM_ID = 10 -- Only Invoices from Genesis
@@ -349,7 +354,8 @@ financials as
     )
 
     select * from
-          (  select
+          (-- cus level spendings could be calculated later on once credit has been removed
+          select
                 cust_det.customer,
                 cust_det.custname,
                 --cust_det.cust_status as customer_status,
@@ -367,11 +373,13 @@ financials as
                 cust_det.country,
                 sum(financials.active_subs_value) AS LBU_Subscr,
                 sum(CAE_subs_value) as LBU_CAE_VAL,
+                /*
                 SUM(sum(financials.active_subs_value)) over (partition by  CUST_DET.CUSTOMER) as Cust_Subscr,
                 SUM(sum(CAE_subs_value)) OVER   (partition by  CUST_DET.CUSTOMER) as CUST_CAE_VAL,
                 NULLIF(SUM(sum(CAE_subs_value)) OVER   (partition by  CUST_DET.CUSTOMER),0) /   SUM(sum(financials.active_subs_value)) over (partition by  CUST_DET.CUSTOMER) AS Cust_CAE_p,
                case when  nvl(SUM(SUM(CY_ON_AMT)) OVER (partition by  CUST_DET.CUSTOMER),0) > 0 then 'Y' else 'N' end AS CUS_HAS_CY_ONLINE_SPEND,
                case when  nvl(SUM(SUM(PY_ON_AMT)) OVER (partition by  CUST_DET.CUSTOMER),0) >  0 then 'Y' else 'N' end AS CUS_HAS_PY_ONLINE_SPEND,
+               */
                 case when  nvl(SUM(SUM(LBU_renewal_flg)) OVER (partition by  CUST_DET.CUSTOMER),0) > 0 then 'Y' else 'N' end AS Cust_ON_RenewalFlg ,
                 case when  nvl(SUM(financials.LBU_renewal_flg) ,0) > 0 then 'Y' else 'N' end AS LBU_ON_RenewalFlg ,
 
@@ -384,28 +392,30 @@ financials as
                 NVL(SUM(financials.CY_PR_AMT),0) AS LBU_CY_PR_AMT,
                 NVL(SUM( financials.CY_OA_AMT),0) AS LBU_CY_OA_AMT,
                 NVL( SUM(financials.CY_ON_AMT) + SUM(financials.CY_PR_AMT) + SUM( financials.CY_OA_AMT),0) AS LBU_CY_TOT,
+                /*
                 -- CURRENT YEAR CUST
                 NVL(SUM(SUM(financials.CY_ON_AMT)) OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_CY_ON_AMT,
                 NVL(SUM(SUM(financials.CY_PR_AMT)) OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_CY_PR_AMT,
                 NVL(SUM(SUM( financials.CY_OA_AMT)) OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_CY_OA_AMT,
                 NVL(SUM(SUM(financials.CY_ON_AMT)) OVER (PARTITION BY CUST_DET.CUSTOMER) + SUM(SUM(financials.CY_PR_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER) + SUM(SUM( financials.CY_OA_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_CY_TOT,
-
+*/
                 -- PREVIOUS YEAR LBU
                 NVL(SUM(financials.PY_ON_AMT),0) AS LBU_PY_ON_AMT,
                 NVL(SUM(financials.PY_PR_AMT),0) AS LBU_PY_PR_AMT,
                 NVL(SUM( financials.PY_OA_AMT),0) AS LBU_PY_OA_AMT,
                 NVL( SUM(financials.PY_ON_AMT) + SUM(financials.PY_PR_AMT) + SUM( financials.PY_OA_AMT),0) AS LBU_PY_TOT,
+                /*
                 -- PREVIOUS YEAR CUST
                 NVL(SUM(SUM(financials.PY_ON_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_PY_ON_AMT,
                 NVL(SUM(SUM(financials.PY_PR_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_PY_PR_AMT,
                 NVL(SUM(SUM( financials.PY_OA_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_PY_OA_AMT,
                 NVL(SUM(SUM(financials.PY_ON_AMT)) OVER (PARTITION BY CUST_DET.CUSTOMER) + SUM(SUM(financials.PY_PR_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER) + SUM(SUM( financials.PY_OA_AMT))  OVER (PARTITION BY CUST_DET.CUSTOMER),0) AS CUS_PY_TOT,
-
+*/
                 {0} as YrPer,
-
+/*
                 -- NEED TO EXCLUDE CL REPCODES WITH NO SPEND AT CUST LEVEL IN PREVIOUS YEAR
                 CASE WHEN cust_det.repcode = 'CL' AND   (NVL( SUM(financials.PY_ON_AMT) + SUM(financials.PY_PR_AMT) + SUM( financials.PY_OA_AMT),0) ) = 0  THEN 'Y' ELSE 'N' END AS excldclosedacct
-
+*/
         from     cust_det
         left join financials on financials.customer = cust_det.customer and financials.account = cust_det.account
         GROUP BY
