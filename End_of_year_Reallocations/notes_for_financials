@@ -16,21 +16,18 @@ CREDIT_PY_ON,CREDIT_PY_PR,CREDIT_PY_OA
 credit needs to be removed from the financial base data
 columns affected:
 CY_ON_AMT,CY_PR_AMT,CY_OA_AMT,cy_tot - at lbu and cus level
-lbu level done
-
-
+done
 PY_ON_AMT,PY_PR_AMT,PY_OA_AMT, py_tot - at lbu and cus level
-lbu level done
-
+done
 active_subs_value - LBU_subscr,cust_subscr
-lbu level done
-
+done
 CAE_subs_value - lbu_cae_val,cust_cae_val,cust_cae_p
-lbu level done
+done
 
 cus_has_cy_online_spend,
+done
 
 cus_has_py_online_spend
-
+done
 excldclosedacct
 done
